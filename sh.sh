@@ -74,7 +74,91 @@ get_xtunnel() {
 }
 
 get_xray() {
-    echo ">>> [TODO] 正在获取/安装 xray..."
+    echo "=========================================="
+    echo "     正在下载最新版 Xray 到当前目录       "
+    echo "=========================================="
+
+    # 1. 检查必要工具 (curl/wget 与 unzip)
+    DOWNLOADER=""
+    if command -v curl >/dev/null 2>&1; then
+        DOWNLOADER="curl"
+    elif command -v wget >/dev/null 2>&1; then
+        DOWNLOADER="wget"
+    else
+        echo "[-] 错误：系统中未检测到 curl 或 wget。"
+        return 1
+    fi
+
+    if ! command -v unzip >/dev/null 2>&1; then
+        echo "[-] 错误：解压 Xray 需要 unzip，请先安装 (例如: apt install -y unzip 或 yum install -y unzip)。"
+        return 1
+    fi
+
+    # 2. 映射系统架构
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64|amd64)
+            XRAY_ARCH="64"
+            ;;
+        aarch64|arm64)
+            XRAY_ARCH="arm64-v8a"
+            ;;
+        armv7l|armhf)
+            XRAY_ARCH="arm32-v7a"
+            ;;
+        i386|i686)
+            XRAY_ARCH="32"
+            ;;
+        *)
+            echo "[-] 错误：当前系统架构 ($ARCH) 暂无预编译支持。"
+            return 1
+            ;;
+    esac
+
+    ZIP_NAME="Xray-linux-${XRAY_ARCH}.zip"
+    DOWNLOAD_URL="https://github.com/XTLS/Xray-core/releases/latest/download/${ZIP_NAME}"
+    TMP_ZIP="./xray_archive.tmp.zip"
+    TMP_DIR="./xray_extract_tmp"
+    TARGET_BIN="./rrr"
+
+    echo "[+] 系统架构: ${ARCH} (对应资源: ${ZIP_NAME})"
+    echo "[+] 下载地址: ${DOWNLOAD_URL}"
+
+    # 3. 下载压缩包
+    if [ "$DOWNLOADER" = "curl" ]; then
+        curl -fL --progress-bar -o "$TMP_ZIP" "$DOWNLOAD_URL"
+    else
+        wget -q --show-progress -O "$TMP_ZIP" "$DOWNLOAD_URL"
+    fi
+
+    if [ $? -ne 0 ] || [ ! -s "$TMP_ZIP" ]; then
+        echo "[-] 下载失败，请检查网络。"
+        rm -f "$TMP_ZIP"
+        return 1
+    fi
+
+    # 4. 解压并提取二进制文件
+    echo "[+] 解压并提取核心二进制文件..."
+    rm -rf "$TMP_DIR"
+    mkdir -p "$TMP_DIR"
+    unzip -q -o "$TMP_ZIP" -d "$TMP_DIR"
+
+    if [ -f "${TMP_DIR}/xray" ]; then
+        mv -f "${TMP_DIR}/xray" "$TARGET_BIN"
+        chmod +x "$TARGET_BIN"
+        echo "[+] 成功提取到: $(pwd)/xray"
+    else
+        echo "[-] 未在压缩包内找到 xray 可执行文件。"
+        rm -rf "$TMP_DIR" "$TMP_ZIP"
+        return 1
+    fi
+
+    # 5. 清理多余临时文件 (文档、geoip.dat、规则库及压缩包)
+    rm -rf "$TMP_DIR" "$TMP_ZIP"
+
+    # 6. 验证
+    echo "[+] 验证运行结果:"
+    "$TARGET_BIN" version
 }
 
 get_singbox() {
