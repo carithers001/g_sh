@@ -70,7 +70,73 @@ get_cloudflared() {
 }
 
 get_xtunnel() {
-    echo ">>> [TODO] 正在获取/安装 xtunnel..."
+    echo "=========================================="
+    echo "    正在下载 xtunnel 到当前目录           "
+    echo "=========================================="
+
+    # 1. 检查基础下载工具
+    DOWNLOADER=""
+    if command -v curl >/dev/null 2>&1; then
+        DOWNLOADER="curl"
+    elif command -v wget >/dev/null 2>&1; then
+        DOWNLOADER="wget"
+    else
+        echo "[-] 错误：系统中未检测到 curl 或 wget。"
+        return 1
+    fi
+
+    # 2. 识别系统架构并映射
+    ARCH=$(uname -m)
+    case "$ARCH" in
+        x86_64|amd64)
+            XT_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            XT_ARCH="arm64"
+            ;;
+        i386|i686)
+            XT_ARCH="386"
+            ;;
+        *)
+            echo "[-] 错误：当前系统架构 ($ARCH) 暂无预编译支持（仅支持 386/amd64/arm64）。"
+            return 1
+            ;;
+    esac
+
+    FILE_NAME="x-tunnel-linux-${XT_ARCH}"
+    DOWNLOAD_URL="https://github.com/carithers001/g_docker_nodejs/releases/download/V0.01/${FILE_NAME}"
+    TARGET_BIN="./xxx"
+    TMP_FILE="./xtunnel.tmp"
+
+    echo "[+] 系统架构: ${ARCH} (匹配文件: ${FILE_NAME})"
+    echo "[+] 下载地址: ${DOWNLOAD_URL}"
+
+    # 3. 下载到临时文件
+    echo "[+] 正在下载..."
+    if [ "$DOWNLOADER" = "curl" ]; then
+        curl -fL --progress-bar -o "$TMP_FILE" "$DOWNLOAD_URL"
+    else
+        wget -q --show-progress -O "$TMP_FILE" "$DOWNLOAD_URL"
+    fi
+
+    if [ $? -ne 0 ] || [ ! -s "$TMP_FILE" ]; then
+        echo "[-] 下载失败，请检查网络连接或目标地址是否存在。"
+        rm -f "$TMP_FILE"
+        return 1
+    fi
+
+    # 4. 重命名并赋予可执行权限
+    mv -f "$TMP_FILE" "$TARGET_BIN"
+    chmod +x "$TARGET_BIN"
+
+    # 5. 验证文件
+    if [ -x "$TARGET_BIN" ]; then
+        echo "[+] 下载成功！文件路径: $(pwd)/xtunnel"
+        ls -lh "$TARGET_BIN"
+    else
+        echo "[-] 文件下载异常。"
+        return 1
+    fi
 }
 
 get_xray() {
