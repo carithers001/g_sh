@@ -329,6 +329,101 @@ get_singbox() {
     "$TARGET_BIN" version
 }
 
+# ==================== 运行任务函数 ====================
+run_cloudflared() {
+    # 1. 检查当前目录下是否存在 ccc
+    if [ ! -x "./ccc" ]; then
+        echo "[-] 未检测到可执行文件 ./ccc，请先执行下载！"
+        return 1
+    fi
+
+    # 2. 交互式接收 Token 输入
+    printf "请输入 Cloudflare Tunnel Token: "
+    read -r cf_token
+
+    # 去除可能误输入的首尾空格
+    cf_token=$(echo "$cf_token" | tr -d '[:space:]')
+
+    if [ -z "$cf_token" ]; then
+        echo "[-] 错误：Token 不能为空！"
+        return 1
+    fi
+
+    # 3. 后台启动进程
+    echo "[+] 正在启动 ccc..."
+    nohup ./ccc tunnel run --edge-ip-version 4 --protocol http2 --no-autoupdate --token "$cf_token" > /dev/null 2>&1 &
+    pid=$!
+
+    # 4. 验证进程是否成功驻留
+    sleep 1
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "[+] ccc 启动成功！"
+        echo "[+] 后台 PID: ${pid}"
+    else
+        echo "[-] 启动异常，进程已退出。可尝试直接运行测试: ./ccc tunnel run --token ..."
+    fi
+}
+
+run_xtunnel() {
+    # 1. 检查当前目录下是否存在 xxx
+    if [ ! -x "./xxx" ]; then
+        echo "[-] 未检测到可执行文件 ./xxx，请先选择 [2] 下载！"
+        return 1
+    fi
+
+    # 2. 交互式接收 Token 输入
+    printf "请输入 xtunnel Token (例如 free): "
+    read -r xt_token
+
+    # 去除可能误输入的首尾空格
+    xt_token=$(echo "$xt_token" | tr -d '[:space:]')
+
+    if [ -z "$xt_token" ]; then
+        echo "[-] 错误：Token 不能为空！"
+        return 1
+    fi
+
+    # 3. 后台启动进程
+    echo "[+] 正在后台启动 xxx..."
+    nohup ./xxx -l ws://127.0.0.1:8081 -token "$xt_token" > /dev/null 2>&1 &
+    pid=$!
+
+    # 4. 验证进程是否成功驻留
+    sleep 1
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "[+] xxx 启动成功！"
+        echo "[+] 后台 PID: ${pid}"
+    else
+        echo "[-] 启动异常，进程已退出。可尝试直接运行排查: ./xxx -l ws://127.0.0.1:8081 -token $xt_token"
+    fi
+}
+
+run_xray() {
+    if [ ! -x "./rrr" ]; then
+        echo "[-] 未检测到 ./xray，请先选择 [3] 下载！"
+        return 1
+    fi
+    echo "[+] 准备启动 xray (当前目录: $(pwd))"
+    printf "请输入启动参数 (直接回车默认运行，例如 'run -c config.json'): "
+    read -r args
+    echo "[+] 执行: ./rrr $args"
+    # shellcheck disable=SC2086
+    ./rrr $args
+}
+
+run_singbox() {
+    if [ ! -x "./sss" ]; then
+        echo "[-] 未检测到 ./sing-box，请先选择 [4] 下载！"
+        return 1
+    fi
+    echo "[+] 准备启动 sing-box (当前目录: $(pwd))"
+    printf "请输入启动参数 (直接回车默认运行，例如 'run -c config.json'): "
+    read -r args
+    echo "[+] 执行: ./sss $args"
+    # shellcheck disable=SC2086
+    ./sss $args
+}
+
 # ==================== 二级菜单：fly ====================
 fly_menu() {
     while true; do
@@ -336,13 +431,21 @@ fly_menu() {
         echo "=================================="
         echo "           Fly 子菜单             "
         echo "=================================="
-        echo " 1) 获取 cloudflared"
-        echo " 2) 获取 xtunnel"
-        echo " 3) 获取 xray"
-        echo " 4) 获取 sing-box"
-        echo " 0) 返回上一级菜单"
+        echo " [下载区]"
+        echo "  1) 获取 cloudflared"
+        echo "  2) 获取 xtunnel"
+        echo "  3) 获取 xray"
+        echo "  4) 获取 sing-box"
+        echo "----------------------------------"
+        echo " [运行区]"
+        echo " 51) 运行 cloudflared"
+        echo " 52) 运行 xtunnel"
+        echo " 53) 运行 xray"
+        echo " 54) 运行 sing-box"
+        echo "----------------------------------"
+        echo "  0) 返回上一级菜单"
         echo "=================================="
-        printf "请输入数字 [0-4]: "
+        printf "请输入数字: "
         read -r sub_choice
 
         case "$sub_choice" in
@@ -358,12 +461,24 @@ fly_menu() {
             4)
                 get_singbox
                 ;;
+            51)
+                run_cloudflared
+                ;;
+            52)
+                run_xtunnel
+                ;;
+            53)
+                run_xray
+                ;;
+            54)
+                run_singbox
+                ;;
             0)
                 echo "返回主菜单..."
-                break  # 跳出当前 while 循环，返回上一层
+                break
                 ;;
             *)
-                echo "输入无效，请输入 0 到 4 之间的数字！"
+                echo "输入无效，请重新输入！"
                 ;;
         esac
     done
