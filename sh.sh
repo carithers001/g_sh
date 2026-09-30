@@ -340,37 +340,36 @@ get_singbox() {
 
 # ==================== 运行任务函数 ====================
 run_cloudflared() {
-    clear
-    # 1. 检查当前目录下是否存在 ccc
+    # 1. 检查二进制文件
     if [ ! -x "./ccc" ]; then
         echo "[-] 未检测到可执行文件 ./ccc，请先执行下载！"
         return 1
     fi
 
-    # 2. 交互式接收 Token 输入
-    printf "请输入 Cloudflare Tunnel Token: "
-    read -r cf_token
+    # 2. 接收输入并自动过滤出 ey 开头的 token
+    printf "请输入或粘贴 Token / 启动指令: "
+    read -r raw_input < /dev/tty
 
-    # 去除可能误输入的首尾空格
-    cf_token=$(echo "$cf_token" | tr -d '[:space:]')
+    # 仅提取以 ey 开头、长度大于 20 位的 Base64 字符串，忽略前后其他命令
+    cf_token=$(echo "$raw_input" | grep -o 'ey[A-Za-z0-9_=-]\{20,\}' | head -n 1)
 
     if [ -z "$cf_token" ]; then
-        echo "[-] 错误：Token 不能为空！"
+        echo "[-] 错误：未识别到有效 Token（必须以 ey 开头）！"
         return 1
     fi
 
-    # 3. 后台启动进程
-    echo "[+] 正在启动 ccc..."
+    # 3. 后台静默启动（不生成任何日志文件，完全丢弃到 /dev/null）
+    echo "[+] 正在后台启动 ccc..."
     nohup ./ccc tunnel run --edge-ip-version 4 --protocol http2 --no-autoupdate --token "$cf_token" > /dev/null 2>&1 &
     pid=$!
 
-    # 4. 验证进程是否成功驻留
+    # 4. 检验进程是否存活
     sleep 1
     if kill -0 "$pid" 2>/dev/null; then
         echo "[+] ccc 启动成功！"
         echo "[+] 后台 PID: ${pid}"
     else
-        echo "[-] 启动异常，进程已退出。可尝试直接运行测试: ./ccc tunnel run --token ..."
+        echo "[-] 启动失败，进程未正常驻留。"
     fi
 }
 
