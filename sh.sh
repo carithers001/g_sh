@@ -1,5 +1,10 @@
 #!/bin/sh
 
+pause() {
+    printf "\n按 [回车键] 返回菜单..."
+    read -r _ < /dev/tty
+}
+
 # ==================== 具体任务执行函数 ====================
 get_cloudflared() {
     clear
@@ -489,6 +494,7 @@ fly_menu() {
                 echo "输入无效，请重新输入！"
                 ;;
         esac
+        pause
     done
 }
 
@@ -522,6 +528,7 @@ main_menu() {
                 echo "输入无效，请输入 0 到 2 之间的数字！"
                 ;;
         esac
+        pause
     done
 }
 
