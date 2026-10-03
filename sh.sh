@@ -630,6 +630,187 @@ fly_menu() {
         pause
     done
 }
+# ======================================================================================================================================================
+# ==================== 软件包管理辅助函数 ====================
+detect_pm() {
+    [ "$(id -u)" -ne 0 ] && SUDO="sudo" || SUDO=""
+
+    if command -v apt-get >/dev/null 2>&1; then
+        PM="apt"
+        PM_INSTALL="$SUDO apt-get update -y && $SUDO apt-get install -y"
+    elif command -v dnf >/dev/null 2>&1; then
+        PM="dnf"
+        PM_INSTALL="$SUDO dnf install -y"
+    elif command -v yum >/dev/null 2>&1; then
+        PM="yum"
+        PM_INSTALL="$SUDO yum install -y"
+    elif command -v apk >/dev/null 2>&1; then
+        PM="apk"
+        PM_INSTALL="$SUDO apk add --no-cache"
+    elif command -v pacman >/dev/null 2>&1; then
+        PM="pacman"
+        PM_INSTALL="$SUDO pacman -Sy --noconfirm"
+    else
+        echo "[-] 未识别到受支持的包管理器 (apt/dnf/yum/apk/pacman)！"
+        return 1
+    fi
+}
+
+install_epel_if_needed() {
+    # CentOS / RHEL 系列需要启用 EPEL 源才能安装 vnstat / iftop
+    if [ "$PM" = "yum" ] || [ "$PM" = "dnf" ]; then
+        echo "[+] 检测到 RHEL/CentOS 系列，正在确保 EPEL 源已启用..."
+        $PM_INSTALL epel-release >/dev/null 2>&1
+    fi
+}
+
+# ==================== 具体安装功能 ====================
+install_curl_wget() {
+    echo "[+] 正在安装 curl 和 wget..."
+    detect_pm || return 1
+    sh -c "$PM_INSTALL curl wget ca-certificates"
+    echo "[+] 安装完成！"
+}
+
+install_ps_proc() {
+    echo "[+] 正在安装 ps (procps) 及系统排查工具..."
+    detect_pm || return 1
+
+    # 包名兼容处理
+    case "$PM" in
+        apt|apk)
+            PKGS="procps htop lsof net-tools"
+            ;;
+        yum|dnf)
+            PKGS="procps-ng htop lsof net-tools"
+            ;;
+        pacman)
+            PKGS="procps-ng htop lsof net-tools"
+            ;;
+    esac
+
+    sh -c "$PM_INSTALL $PKGS"
+    echo "[+] 安装完成！当前 ps 状态："
+    ps -V || ps --version
+}
+
+install_traffic_tools() {
+    echo "[+] 正在安装网络流量监控与统计工具 (vnstat / iftop)..."
+    detect_pm || return 1
+    install_epel_if_needed
+
+    sh -c "$PM_INSTALL vnstat iftop"
+
+    # 如果有 systemd，自动启用并启动 vnstat 后台流量统计守护进程
+    if command -v systemctl >/dev/null 2>&1; then
+        echo "[+] 正在启动并设置 vnstat 流量统计开机自启..."
+        $SUDO systemctl enable --now vnstat >/dev/null 2>&1
+    fi
+
+    echo "[+] 流量工具安装完成！"
+    echo "----------------------------------------"
+    echo "常用命令："
+    echo "  - 查看历史流量统计: vnstat (需运行一段时间后生成数据)"
+    echo "  - 查看实时网络吞吐: vnstat -l"
+    echo "  - 查看实时连接连接与带宽消耗: iftop"
+    echo "----------------------------------------"
+}
+
+install_archive_tools() {
+    echo "[+] 正在安装常见解压缩工具 (tar, unzip, gzip, bzip2, xz)..."
+    detect_pm || return 1
+
+    case "$PM" in
+        apt)
+            PKGS="tar unzip gzip bzip2 xz-utils"
+            ;;
+        yum|dnf|apk|pacman)
+            PKGS="tar unzip gzip bzip2 xz"
+            ;;
+    esac
+
+    sh -c "$PM_INSTALL $PKGS"
+    echo "[+] 解压工具安装完成！"
+}
+
+install_all_common() {
+    echo "[+] 开始一键安装全部常用工具合集..."
+    detect_pm || return 1
+    install_epel_if_needed
+
+    case "$PM" in
+        apt|apk)
+            PKGS="curl wget procps vnstat iftop htop lsof unzip tar ca-certificates net-tools"
+            ;;
+        yum|dnf)
+            PKGS="curl wget procps-ng vnstat iftop htop lsof unzip tar ca-certificates net-tools"
+            ;;
+        pacman)
+            PKGS="curl wget procps-ng vnstat iftop htop lsof unzip tar ca-certificates net-tools"
+            ;;
+    esac
+
+    sh -c "$PM_INSTALL $PKGS"
+
+    if command -v systemctl >/dev/null 2>&1; then
+        $SUDO systemctl enable --now vnstat >/dev/null 2>&1
+    fi
+
+    echo "[+] 全部常用工具安装完成！"
+}
+
+# ==================== 二级菜单：install ====================
+install_menu() {
+    while true; do
+        clear
+        echo ""
+        echo "=================================="
+        echo "          Install 常用工具        "
+        echo "=================================="
+        echo "  1) 安装 下载工具 (curl, wget)"
+        echo "  2) 安装 进程/系统工具 (ps/procps, htop, lsof)"
+        echo "  3) 安装 流量统计与监控 (vnstat, iftop)"
+        echo "  4) 安装 解压缩工具 (unzip, tar, gzip, xz)"
+        echo " 99) 一键安装推荐全部工具"
+        echo "----------------------------------"
+        echo "  0) 返回上一级菜单"
+        echo "=================================="
+        printf "请输入数字 [0-4, 99]: "
+        read -r ins_choice < /dev/tty
+
+        case "$ins_choice" in
+            1)
+                install_curl_wget
+                pause
+                ;;
+            2)
+                install_ps_proc
+                pause
+                ;;
+            3)
+                install_traffic_tools
+                pause
+                ;;
+            4)
+                install_archive_tools
+                pause
+                ;;
+            99)
+                install_all_common
+                pause
+                ;;
+            0)
+                break
+                ;;
+            *)
+                echo "输入无效，请重新输入！"
+                pause
+                ;;
+        esac
+    done
+}
+
+# =======================================================================================================================================================
 
 # ==================== 一级主菜单 ====================
 main_menu() {
@@ -640,18 +821,18 @@ main_menu() {
         echo "            主菜单                "
         echo "=================================="
         echo " 1) fly"
-        echo " 2) 功能待添加..."
+        echo " 2) install"
         echo " 0) 退出程序"
         echo "=================================="
         printf "请输入数字 [0-2]: "
-        read -r main_choice
+        read -r main_choice < /dev/tty
 
         case "$main_choice" in
             1)
                 fly_menu
                 ;;
             2)
-                echo "功能 2 尚未实现。"
+                install_menu
                 ;;
             0)
                 echo "已退出脚本。"
@@ -659,9 +840,9 @@ main_menu() {
                 ;;
             *)
                 echo "输入无效，请输入 0 到 2 之间的数字！"
+                pause
                 ;;
         esac
-        pause
     done
 }
 
