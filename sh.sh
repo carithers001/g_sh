@@ -812,6 +812,151 @@ install_menu() {
 
 # =======================================================================================================================================================
 
+# ==================== 状态检测相关函数 ====================
+show_system_overview() {
+    clear
+    echo "=========================================="
+    echo "              系统综合概览                "
+    echo "=========================================="
+    OS_NAME="Linux"
+    [ -f /etc/os-release ] && OS_NAME=$(grep -E '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
+    
+    echo "[系统发行版] : ${OS_NAME} ($(uname -m))"
+    echo "[内核版本]   : $(uname -r)"
+    echo "[开机时间]   : $(uptime | awk -F'up ' '{print $2}' | awk -F',' '{print $1}')"
+    echo "[系统负载]   : $(uptime | awk -F'load average:' '{print $2}')"
+    echo ""
+    CPU_MODEL=$(grep 'model name' /proc/cpuinfo 2>/dev/null | head -n 1 | cut -d: -f2 | sed 's/^[ \t]*//')
+    CPU_CORES=$(grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo "1")
+    echo "[CPU 信息]   : ${CPU_MODEL:-Virtual CPU} (${CPU_CORES} 核)"
+    echo ""
+    echo "[内存占用] :"
+    free -h 2>/dev/null || free -m
+    echo ""
+    echo "[磁盘使用] :"
+    df -h -x tmpfs -x devtmpfs -x overlay 2>/dev/null || df -h
+    echo "=========================================="
+}
+
+show_mem_detail() {
+    clear
+    echo "=========================================="
+    echo "             内存与 Swap 详情             "
+    echo "=========================================="
+    free -h 2>/dev/null || free -m
+    echo ""
+    echo "[MemAvailable / MemTotal] :"
+    grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):' /proc/meminfo
+    echo "=========================================="
+}
+
+show_disk_detail() {
+    clear
+    echo "=========================================="
+    echo "             磁盘存储占用详情             "
+    echo "=========================================="
+    df -h -x tmpfs -x devtmpfs -x overlay 2>/dev/null || df -h
+    echo ""
+    if command -v lsblk >/dev/null 2>&1; then
+        echo "[块设备结构 (lsblk)] :"
+        lsblk
+    fi
+    echo "=========================================="
+}
+
+show_service_status() {
+    clear
+    echo "=========================================="
+    echo "          后台节点与进程状态              "
+    echo "=========================================="
+    for bin in ccc xxx rrr sss; do
+        # 查找匹配当前目录可执行文件的进程 PID
+        pids=$(pgrep -f "\./$bin" 2>/dev/null || ps aux | grep "[.]/$bin" | awk '{print $2}')
+        if [ -n "$pids" ]; then
+            echo "[● 运行中] $bin -> PID: $(echo $pids | tr '\n' ' ')"
+        else
+            echo "[○ 未运行] $bin"
+        fi
+    done
+    echo ""
+    echo "[本地端口监听 (关注 8081 / 8088)] :"
+    if command -v ss >/dev/null 2>&1; then
+        ss -tlnp | grep -E ':(8081|8088)\b' || echo "  (暂未检测到 8081/8088 端口监听)"
+    elif command -v netstat >/dev/null 2>&1; then
+        netstat -tlnp | grep -E ':(8081|8088)\b' || echo "  (暂未检测到 8081/8088 端口监听)"
+    else
+        echo "  (未安装 ss/netstat，可通过 install 菜单安装)"
+    fi
+    echo "=========================================="
+}
+
+show_traffic_detail() {
+    clear
+    echo "=========================================="
+    echo "              网络流量统计                "
+    echo "=========================================="
+    if command -v vnstat >/dev/null 2>&1; then
+        vnstat
+    else
+        echo "[-] 未安装 vnstat 流量统计工具！"
+        echo "[+] 可在主菜单选择 [2 -> 3] 或 [2 -> 99] 快速安装。"
+    fi
+    echo "=========================================="
+}
+
+# ==================== 二级菜单：status ====================
+status_menu() {
+    while true; do
+        clear
+        echo ""
+        echo "=================================="
+        echo "         Status 系统状态          "
+        echo "=================================="
+        echo "  1) 综合概览 (系统/CPU/内存/磁盘)"
+        echo "  2) 内存与 Swap 占用详情"
+        echo "  3) 磁盘与挂载占用详情"
+        echo "  4) 节点运行状态 (ccc/xxx/rrr/sss 及端口)"
+        echo "  5) 网络历史与累计流量 (vnstat)"
+        echo "----------------------------------"
+        echo "  0) 返回上一级菜单"
+        echo "=================================="
+        printf "请输入数字 [0-5]: "
+        read -r st_choice < /dev/tty
+
+        case "$st_choice" in
+            1)
+                show_system_overview
+                pause
+                ;;
+            2)
+                show_mem_detail
+                pause
+                ;;
+            3)
+                show_disk_detail
+                pause
+                ;;
+            4)
+                show_service_status
+                pause
+                ;;
+            5)
+                show_traffic_detail
+                pause
+                ;;
+            0)
+                break
+                ;;
+            *)
+                echo "输入无效，请重新输入！"
+                pause
+                ;;
+        esac
+    done
+}
+
+#========================================================================================================================================================
+
 # ==================== 一级主菜单 ====================
 main_menu() {
     while true; do
@@ -820,11 +965,12 @@ main_menu() {
         echo "=================================="
         echo "            主菜单                "
         echo "=================================="
-        echo " 1) fly"
-        echo " 2) install"
-        echo " 0) 退出程序"
+        echo "  1) fly"
+        echo "  2) install"
+        echo " 99) status"
+        echo "  0) 退出程序"
         echo "=================================="
-        printf "请输入数字 [0-2]: "
+        printf "请输入数字 [1, 2, 99, 0]: "
         read -r main_choice < /dev/tty
 
         case "$main_choice" in
@@ -834,12 +980,15 @@ main_menu() {
             2)
                 install_menu
                 ;;
+            99)
+                status_menu
+                ;;
             0)
                 echo "已退出脚本。"
                 exit 0
                 ;;
             *)
-                echo "输入无效，请输入 0 到 2 之间的数字！"
+                echo "输入无效，请重新输入！"
                 pause
                 ;;
         esac
