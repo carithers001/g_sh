@@ -491,16 +491,83 @@ EOF
 }
 
 run_singbox() {
-    if [ ! -x "./sss" ]; then
-        echo "[-] 未检测到 ./sing-box，请先选择 [4] 下载！"
+    # 1. 检查二进制文件（优先检测 sss，兼容 sing-box）
+    BIN="./sss"
+    if [ ! -x "$BIN" ]; then
+        if [ -x "./sing-box" ]; then
+            BIN="./sing-box"
+        else
+            echo "[-] 未检测到可执行文件 ./sss (或 ./sing-box)，请先下载！"
+            return 1
+        fi
+    fi
+
+    # 2. 交互式获取端口（默认 8088）
+    DEFAULT_PORT="8088"
+    printf "请输入监听端口 (直接回车默认: %s): " "$DEFAULT_PORT"
+    read -r input_port < /dev/tty
+    input_port=$(echo "$input_port" | tr -d '[:space:]')
+    PORT="${input_port:-$DEFAULT_PORT}"
+
+    # 3. 交互式获取 UUID（默认 32124d66-a097-417e-bdfe-4e80f7f460e5）
+    DEFAULT_UUID="32124d66-a097-417e-bdfe-4e80f7f460e5"
+    printf "请输入 UUID (直接回车默认: %s): " "$DEFAULT_UUID"
+    read -r input_uuid < /dev/tty
+    input_uuid=$(echo "$input_uuid" | tr -d '[:space:]')
+    UUID="${input_uuid:-$DEFAULT_UUID}"
+
+    # 4. 动态生成 sing-box 专属配置文件 singbox.json (避免与 xray 的 config.json 冲突)
+    cat <<EOF > singbox.json
+{
+  "log": {
+    "disabled": true
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-in",
+      "listen": "127.0.0.1",
+      "listen_port": $PORT,
+      "users": [
+        {
+          "name": "default",
+          "uuid": "$UUID"
+        }
+      ],
+      "transport": {
+        "type": "ws",
+        "path": "/v1"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
+EOF
+
+    # 5. 后台静默启动（不生成任何日志）
+    echo "[+] 正在后台启动 ${BIN}..."
+    nohup "$BIN" run -c singbox.json > /dev/null 2>&1 &
+    pid=$!
+
+    # 6. 校验运行状态
+    sleep 1
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "[+] sing-box 启动成功！"
+        echo "[+] 监听地址: 127.0.0.1:${PORT}"
+        echo "[+] 协议类型: VLESS + WebSocket"
+        echo "[+] Path路径: /v1"
+        echo "[+] 当前UUID: ${UUID}"
+        echo "[+] 配置文件: $(pwd)/singbox.json"
+        echo "[+] 后台 PID: ${pid}"
+    else
+        echo "[-] 启动失败，进程未正常驻留（请确认端口 ${PORT} 未被占用）。"
         return 1
     fi
-    echo "[+] 准备启动 sing-box (当前目录: $(pwd))"
-    printf "请输入启动参数 (直接回车默认运行，例如 'run -c config.json'): "
-    read -r args
-    echo "[+] 执行: ./sss $args"
-    # shellcheck disable=SC2086
-    ./sss $args
 }
 
 # ==================== 二级菜单：fly ====================
