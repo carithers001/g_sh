@@ -472,7 +472,7 @@ EOF
 
     # 5. 后台静默启动（不生成任何日志）
     echo "[+] 正在后台启动 ${BIN}..."
-    nohup "$BIN" run -c config.json > /dev/null 2>&1 &
+    nohup "$BIN" run > /dev/null 2>&1 &
     pid=$!
 
     # 6. 校验运行状态
@@ -516,8 +516,8 @@ run_singbox() {
     input_uuid=$(echo "$input_uuid" | tr -d '[:space:]')
     UUID="${input_uuid:-$DEFAULT_UUID}"
 
-    # 4. 动态生成 sing-box 专属配置文件 singbox.json (避免与 xray 的 config.json 冲突)
-    cat <<EOF > singbox.json
+    # 4. 动态生成 sing-box 配置文件 config.json
+    cat <<EOF > config.json
 {
   "log": {
     "disabled": true
@@ -551,7 +551,7 @@ EOF
 
     # 5. 后台静默启动（不生成任何日志）
     echo "[+] 正在后台启动 ${BIN}..."
-    nohup "$BIN" run -c singbox.json > /dev/null 2>&1 &
+    nohup "$BIN" run > /dev/null 2>&1 &
     pid=$!
 
     # 6. 校验运行状态
@@ -562,7 +562,7 @@ EOF
         echo "[+] 协议类型: VLESS + WebSocket"
         echo "[+] Path路径: /v1"
         echo "[+] 当前UUID: ${UUID}"
-        echo "[+] 配置文件: $(pwd)/singbox.json"
+        echo "[+] 配置文件: $(pwd)/config.json"
         echo "[+] 后台 PID: ${pid}"
     else
         echo "[-] 启动失败，进程未正常驻留（请确认端口 ${PORT} 未被占用）。"
