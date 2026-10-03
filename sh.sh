@@ -7,7 +7,6 @@ pause() {
 
 # ==================== 具体任务执行函数 ====================
 get_cloudflared() {
-    clear
     echo "=========================================="
     echo "    正在下载最新版 cloudflared 到当前目录 "
     echo "=========================================="
@@ -383,7 +382,7 @@ run_xtunnel() {
 
     # 2. 交互式接收 Token 输入
     printf "请输入 xtunnel Token (例如 free): "
-    read -r xt_token
+    read -r xt_token < /dev/tty
 
     # 去除可能误输入的首尾空格
     xt_token=$(echo "$xt_token" | tr -d '[:space:]')
