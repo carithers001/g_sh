@@ -356,10 +356,11 @@ run_cloudflared() {
         echo "[-] 错误：未识别到有效 Token（必须以 ey 开头）！"
         return 1
     fi
+    echo "$cf_token"
 
     # 3. 后台静默启动（不生成任何日志文件，完全丢弃到 /dev/null）
     echo "[+] 正在后台启动 ccc..."
-    nohup ./ccc tunnel run --edge-ip-version 4 --protocol http2 --no-autoupdate --token "$cf_token" > /dev/null 2>&1 &
+    nohup ./ccc tunnel run --edge-ip-version 4 --protocol http2 --no-autoupdate --token $cf_token > /dev/null 2>&1 &
     pid=$!
 
     # 4. 检验进程是否存活
