@@ -360,6 +360,7 @@ run_cloudflared() {
 
     # 3. 后台静默启动（不生成任何日志文件，完全丢弃到 /dev/null）
     echo "[+] 正在后台启动 ccc..."
+    echo "nohup ./ccc tunnel run --edge-ip-version 4 --protocol http2 --no-autoupdate --token $cf_token > /dev/null 2>&1 & "
     nohup ./ccc tunnel run --edge-ip-version 4 --protocol http2 --no-autoupdate --token $cf_token > /dev/null 2>&1 &
     pid=$!
 
